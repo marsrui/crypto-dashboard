@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>農曆週期交易儀表板</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+
+:root {
+  --bg:       #0a0e1a;
+  --bg2:      #111827;
+  --bg3:      #1a2235;
+  --border:   #1e2d45;
+  --accent:   #00d4ff;
+  --green:    #00e676;
+  --red:      #ff4444;
+  --amber:    #ffb300;
+  --purple:   #a855f7;
+  --text:     #e2e8f0;
+  --text2:    #7a8fa6;
+  --text3:    #4a5c70;
+  --card-r:   12px;
+  --mono:     'Space Mono', monospace;
+  --sans:     'Noto Sans TC', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Grid background ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  margin-bottom: 20px;
+}
+.logo {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.logo span { color: var(--text2); }
+.header-right { display: flex; align-items: center; gap: 16px; }
+.clock {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text2);
+}
+.scan-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.scan-btn:hover { background: #33dcff; transform: translateY(-1px); }
+.scan-btn:disabled { background: var(--text3); cursor: not-allowed; transform: none; }
+
+/* ── Status bar ── */
+.status-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.stat-card.lunar::before  { background: var(--purple); }
+.stat-card.btc::before    { background: var(--amber); }
+.stat-card.mode::before   { background: var(--green); }
+.stat-card.signals::before{ background: var(--accent); }
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--mono);
+  line-height: 1;
+}
+.stat-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.up   { color: var(--green); }
+.down { color: var(--red); }
+.neu  { color: var(--accent); }
+.warn { color: var(--amber); }
+
+/* ── Main layout ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+}
+
+/* ── Table panel ── */
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.panel-meta { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  padding: 10px 14px;
+  font-size: 10px;
+  color: var(--text3);
+  text-align: left;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+td {
+  padding: 12px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(30,45,69,0.5);
+  transition: background 0.15s;
+}
+tr:hover td { background: rgba(0,212,255,0.03); }
+tr:last-child td { border-bottom: none; }
+
+.sym {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+.sym-full { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.badge-A    { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+.badge-B    { background: rgba(255,179,0,0.15); color: var(--amber); border: 1px solid rgba(255,179,0,0.3); }
+.badge-C    { background: rgba(122,143,166,0.15); color: var(--text2); border: 1px solid var(--border); }
+.badge-EXIT { background: rgba(255,68,68,0.15); color: var(--red); border: 1px solid rgba(255,68,68,0.3); }
+.badge-NONE { background: transparent; color: var(--text3); border: 1px solid var(--border); }
+
+.dense-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.dense-yes { background: var(--green); }
+.dense-no  { background: var(--text3); animation: none; }
+
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+.action-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: var(--mono);
+  transition: all 0.15s;
+}
+.action-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Right sidebar ── */
+.sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Lunar card ── */
+.lunar-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.lunar-card::after {
+  content: '月';
+  position: absolute;
+  right: -10px; bottom: -20px;
+  font-size: 120px;
+  color: rgba(168,85,247,0.05);
+  font-family: var(--sans);
+  line-height: 1;
+  pointer-events: none;
+}
+.lunar-date {
+  font-family: var(--mono);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--purple);
+  line-height: 1;
+}
+.lunar-date span { font-size: 14px; color: var(--text2); margin-left: 8px; }
+.lunar-mode {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.mode-long  { background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.2); color: var(--green); }
+.mode-short { background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.2); color: var(--red); }
+.mode-watch { background: rgba(122,143,166,0.1); border: 1px solid var(--border); color: var(--text2); }
+.mode-prep  { background: rgba(255,179,0,0.1); border: 1px solid rgba(255,179,0,0.2); color: var(--amber); }
+
+.lunar-tip {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.6;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+/* ── Signal detail card ── */
+.detail-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  padding: 20px;
+  flex: 1;
+}
+.detail-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.detail-sym {
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.detail-price {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 16px;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(30,45,69,0.5);
+  font-size: 13px;
+}
+.detail-row:last-of-type { border-bottom: none; }
+.detail-key { color: var(--text2); }
+.detail-val { font-family: var(--mono); font-weight: 500; }
+
+.sl-tp-box {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg3);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.sl-tp-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.sl-tp-row:last-child { margin-bottom: 0; }
+.sl { color: var(--red); font-family: var(--mono); }
+.tp { color: var(--green); font-family: var(--mono); }
+.rr { color: var(--amber); font-family: var(--mono); }
+
+.buy-signal {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.5;
+}
+.buy-now   { background: rgba(0,230,118,0.12); border: 1px solid var(--green); color: var(--green); }
+.buy-wait  { background: rgba(255,179,0,0.12); border: 1px solid var(--amber); color: var(--amber); }
+.buy-exit  { background: rgba(255,68,68,0.12); border: 1px solid var(--red); color: var(--red); }
+.buy-watch { background: rgba(122,143,166,0.1); border: 1px solid var(--border); color: var(--text2); }
+
+/* ── Loading ── */
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text3);
+  font-size: 13px;
+}
+
+/* ── Log ── */
+.log-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--card-r);
+  margin-top: 20px;
+  overflow: hidden;
+}
+.log-body {
+  height: 120px;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.8;
+}
+.log-line.ok  { color: var(--green); }
+.log-line.err { color: var(--red); }
+.log-line.info{ color: var(--accent); }
+.log-line.warn{ color: var(--amber); }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .status-bar { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">農曆週期 <span>/</span> 交易儀表板</div>
+    <div class="header-right">
+      <div class="clock" id="clock">--:--:--</div>
+      <button class="scan-btn" id="scanBtn" onclick="runScan()">▶ 立即掃描</button>
+    </div>
+  </header>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="stat-card lunar">
+      <div class="stat-label">農曆日期</div>
+      <div class="stat-value neu" id="lunarDay">-- 號</div>
+      <div class="stat-sub" id="lunarStr">載入中...</div>
+    </div>
+    <div class="stat-card btc">
+      <div class="stat-label">BTC 現價</div>
+      <div class="stat-value" id="btcPrice">--</div>
+      <div class="stat-sub" id="btcChange">載入中...</div>
+    </div>
+    <div class="stat-card mode">
+      <div class="stat-label">操作模式</div>
+      <div class="stat-value" id="modeText" style="font-size:16px">--</div>
+      <div class="stat-sub" id="modeSub">--</div>
+    </div>
+    <div class="stat-card signals">
+      <div class="stat-label">本次信號</div>
+      <div class="stat-value neu" id="signalCount">0</div>
+      <div class="stat-sub" id="lastScan">尚未掃描</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-grid">
+
+    <!-- Table -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">24H 漲幅前10名 · 均線分析</div>
+        <div class="panel-meta" id="scanMeta">點擊「立即掃描」開始</div>
+      </div>
+      <div id="tableArea">
+        <div class="empty">點擊右上角「立即掃描」<br>系統將從幣安抓取最新數據並分析均線</div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <!-- Lunar card -->
+      <div class="lunar-card">
+        <div class="stat-label" style="margin-bottom:8px">今日農曆</div>
+        <div class="lunar-date" id="lunarBig">-- <span id="lunarMonthStr"></span></div>
+        <div class="lunar-mode" id="modeCard">載入農曆資訊中...</div>
+        <div class="lunar-tip" id="lunarTip">--</div>
+      </div>
+
+      <!-- Detail card -->
+      <div class="detail-card">
+        <div class="detail-title">▸ 標的詳情</div>
+        <div id="detailContent">
+          <div class="empty" style="padding:20px 0">點擊表格中的幣種<br>查看詳細分析</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-panel">
+    <div class="panel-header">
+      <div class="panel-title">系統日誌</div>
+    </div>
+    <div class="log-body" id="logBody">
+      <div class="log-line info">[ 系統 ] 儀表板已載入，等待掃描指令...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  農曆計算（移植自你的calendarService.js）
+//  使用 lunar-javascript 庫
+// ══════════════════════════════════════════
+const LUNAR_DATA=[0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,0x06ca0,0x0b550,0x15355,0x04da0,0x0a5d0,0x14573,0x052b0,0x0a9a8,0x0e950,0x06aa0,0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b6a0,0x195a6,0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06aa0,0x0a6b9,0x0aad0,0x092b0,0x0aab3,0x04b60,0x0a570,0x05b2f,0x0d950,0x0dd00];
+const LUNAR_MONTHS=["正","二","三","四","五","六","七","八","九","十","十一","臘"];
+const LUNAR_DAYS=["初一","初二","初三","初四","初五","初六","初七","初八","初九","初十","十一","十二","十三","十四","十五","十六","十七","十八","十九","二十","廿一","廿二","廿三","廿四","廿五","廿六","廿七","廿八","廿九","三十"];
+
+function getLunarInfo(date){
+  const y=date.getFullYear(),m=date.getMonth()+1,d=date.getDate();
+  let offset=Math.floor((Date.UTC(y,m-1,d)-Date.UTC(1900,0,31))/86400000);
+  let i,leap=0,temp=0;
+  for(i=1900;i<2101&&offset>0;i++){
+    temp=lunarYearDays(i);offset-=temp;
+  }
+  if(offset<0){offset+=temp;i--;}
+  const year=i;
+  leap=leapMonth(year);
+  let isLeap=false;
+  for(i=1;i<13&&offset>0;i++){
+    if(leap>0&&i==(leap+1)&&!isLeap){--i;isLeap=true;temp=leapDays(year);}
+    else{temp=monthDays(year,i);}
+    if(isLeap&&i==(leap+1))isLeap=false;
+    offset-=temp;
+  }
+  if(offset===0&&leap>0&&i==leap+1){if(isLeap)isLeap=false;else{isLeap=true;--i;}}
+  if(offset<0){offset+=temp;--i;}
+  return{lunarYear:year,lunarMonth:i,lunarDay:offset+1,isLeap};
+}
+function leapMonth(y){return LUNAR_DATA[y-1900]&0xf;}
+function leapDays(y){return leapMonth(y)?((LUNAR_DATA[y-1900]&0x10000)?30:29):0;}
+function monthDays(y,m){return(LUNAR_DATA[y-1900]&(0x10000>>m))?30:29;}
+function lunarYearDays(y){let s=348;for(let i=0x8000;i>0x8;i>>=1)s+=(LUNAR_DATA[y-1900]&i)?1:0;return s+leapDays(y);}
+
+function getTodayLunar(){
+  const now=new Date();
+  const l=getLunarInfo(now);
+  const d=l.lunarDay;
+  let mode,emoji,modeClass,tip;
+  if(d>=13&&d<=17){mode="🚀 多頭進場窗口";modeClass="mode-long";tip="BTC正值階段低點反轉窗口，觀察24H漲幅前10名山寨幣，等待15min均線密集信號進場做多。";}
+  else if(d>=11&&d<=12){mode="👀 多頭預備期";modeClass="mode-prep";tip="接近進場窗口，開始篩選24H漲幅前10名標的，建立觀察清單，等待農曆13-15號信號。";}
+  else if(d>=28){mode="⚠️ 空頭預備期";modeClass="mode-prep";tip="BTC接近階段高點，觀察之前大漲的幣，準備做空清單，等待農曆30/1號信號。";}
+  else if(d<=2){mode="🔴 空頭進場窗口";modeClass="mode-short";tip="BTC階段高點，之前漲最多的幣通常跌最深，等待15min均線密集向下交叉信號做空。";}
+  else{mode="⏸️ 觀望期";modeClass="mode-watch";tip="不在進場窗口，保持觀望，不輕易開新倉。等待農曆11號後進入多頭預備期。";}
+  return{...l,day:d,mode,emoji:"",modeClass,tip,
+    monthStr:LUNAR_MONTHS[l.lunarMonth-1]+"月",
+    dayStr:LUNAR_DAYS[d-1]};
+}
+
+// ══════════════════════════════════════════
+//  幣安 API
+// ══════════════════════════════════════════
+const BINANCE="https://api.binance.com";
+const EXCLUDE=new Set(["BTCUSDT","ETHUSDT","USDCUSDT","BUSDUSDT","TUSDUSDT","USDPUSDT","FDUSDUSDT","BTCDOMUSDT","DEFIUSDT","ALTUSDT"]);
+
+async function fetchBTC(){
+  const r=await fetch(`${BINANCE}/api/v3/ticker/24hr?symbol=BTCUSDT`);
+  return await r.json();
+}
+
+async function fetchTop10(){
+  const r=await fetch(`${BINANCE}/api/v3/ticker/24hr`);
+  const all=await r.json();
+  return all.filter(t=>t.symbol.endsWith("USDT")&&!EXCLUDE.has(t.symbol)&&parseFloat(t.priceChangePercent)>5&&parseFloat(t.quoteVolume)>100000)
+    .sort((a,b)=>parseFloat(b.priceChangePercent)-parseFloat(a.priceChangePercent))
+    .slice(0,10);
+}
+
+async function fetchKlines(symbol,interval="15m",limit=120){
+  const r=await fetch(`${BINANCE}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+  const data=await r.json();
+  return data.map(k=>({open:+k[1],high:+k[2],low:+k[3],close:+k[4],vol:+k[5]}));
+}
+
+// ══════════════════════════════════════════
+//  均線計算
+// ══════════════════════════════════════════
+function calcEMA(closes,n){
+  const k=2/(n+1);
+  let ema=[closes.slice(0,n).reduce((a,b)=>a+b,0)/n];
+  for(let i=n;i<closes.length;i++)ema.push(closes[i]*k+ema[ema.length-1]*(1-k));
+  return ema;
+}
+
+function analyzeMA(candles){
+  if(candles.length<70)return null;
+  const closes=candles.map(c=>c.close);
+  const e20=calcEMA(closes,20);
+  const e60=calcEMA(closes,60);
+  const gap=Math.abs(e20[e20.length-1]-e60[e60.length-1])/e60[e60.length-1]*100;
+  const last=candles[candles.length-1];
+  const lastChg=(last.close-last.open)/last.open*100;
+  const recentHigh=Math.max(...candles.slice(-60).map(c=>c.high));
+  const crossUp=e20[e20.length-2]<e60[e60.length-2]&&e20[e20.length-1]>=e60[e60.length-1];
+  const crossDown=e20[e20.length-2]>e60[e60.length-2]&&e20[e20.length-1]<=e60[e60.length-1];
+  return{ema20:e20[e20.length-1],ema60:e60[e60.length-1],gap:+gap.toFixed(3),
+    isDense:gap<1.5,crossUp,crossDown,lastKChg:+lastChg.toFixed(2),recentHigh,
+    price:closes[closes.length-1]};
+}
+
+// ══════════════════════════════════════════
+//  信號評級
+// ══════════════════════════════════════════
+function evalSignal(lunar,ticker,ma){
+  const isLong=lunar.modeClass==="mode-long"||lunar.modeClass==="mode-prep";
+  const isShort=lunar.modeClass==="mode-short";
+  let score=0,reasons=[];
+  const chg=parseFloat(ticker.priceChangePercent);
+  const price=parseFloat(ticker.lastPrice);
+
+  if(lunar.modeClass==="mode-long"){score+=3;reasons.push(`農曆${lunar.day}號進場窗口`);}
+  else if(lunar.modeClass==="mode-prep"){score+=1;reasons.push("農曆預備期");}
+  if(isLong){
+    if(chg>=50){score+=3;reasons.push(`暴漲+${chg.toFixed(1)}%`);}
+    else if(chg>=30){score+=2;reasons.push(`大漲+${chg.toFixed(1)}%`);}
+    else if(chg>=15){score+=1;reasons.push(`漲+${chg.toFixed(1)}%`);}
+  }
+  if(ma.isDense){score+=3;reasons.push(`均線密集${ma.gap}%`);}
+  if(isLong&&ma.crossUp){score+=4;reasons.push("EMA20↑交叉★");}
+  else if(isShort&&ma.crossDown){score+=4;reasons.push("EMA20↓交叉★");}
+  if(isLong&&ma.lastKChg>=30){score+=5;reasons.push(`15min單K+${ma.lastKChg}%⚡`);}
+  else if(isLong&&ma.lastKChg>=15){score+=2;reasons.push(`15min+${ma.lastKChg}%`);}
+
+  const sl=+(price*0.95).toFixed(6);
+  const tp=+(price*1.30).toFixed(6);
+  const rr=+((tp-price)/(price-sl)).toFixed(1);
+
+  let level,action,buySignal,buyClass;
+  if(ma.lastKChg>=30&&isLong){
+    level="EXIT";action="立即止盈出場！";
+    buySignal="🔴 15min單K超過30%\n建議立即市價賣出";buyClass="buy-exit";
+  } else if(score>=8&&(ma.crossUp||ma.crossDown)){
+    level="A";action=isLong?"做多3倍 $100":"做空3倍 $100";
+    buySignal="🚀 A級信號：均線剛交叉\n建議現在進場，止損設-5%";buyClass="buy-now";
+  } else if(score>=6&&ma.isDense){
+    level="B";action="等待均線交叉確認";
+    buySignal="🔔 B級信號：均線密集中\n等待EMA20向上穿越EMA60再進場";buyClass="buy-wait";
+  } else if(score>=3){
+    level="C";action="納入觀察清單";
+    buySignal="📋 納入觀察\n條件不足，繼續等待";buyClass="buy-watch";
+  } else{
+    level="NONE";action="條件不符";
+    buySignal="⏸️ 無信號";buyClass="buy-watch";
+  }
+  return{level,action,score,reasons,sl,tp,rr,buySignal,buyClass};
+}
+
+// ══════════════════════════════════════════
+//  UI 更新
+// ══════════════════════════════════════════
+let scanResults=[];
+let selectedIdx=null;
+
+function log(msg,type="info"){
+  const lb=document.getElementById("logBody");
+  const div=document.createElement("div");
+  div.className=`log-line ${type}`;
+  const t=new Date().toLocaleTimeString("zh-TW",{hour12:false});
+  div.textContent=`[${t}] ${msg}`;
+  lb.appendChild(div);
+  lb.scrollTop=lb.scrollHeight;
+}
+
+function updateLunar(){
+  const l=getTodayLunar();
+  document.getElementById("lunarDay").textContent=`${l.day} 號`;
+  document.getElementById("lunarStr").textContent=l.dayStr;
+  document.getElementById("lunarBig").innerHTML=`${l.day} <span id="lunarMonthStr">${l.monthStr}</span>`;
+  document.getElementById("modeText").textContent=l.mode;
+  document.getElementById("modeSub").textContent=l.modeClass==="mode-long"?"✓ 可積極做多":l.modeClass==="mode-short"?"✓ 可積極做空":"觀望";
+  const mc=document.getElementById("modeCard");
+  mc.className=`lunar-mode ${l.modeClass}`;
+  mc.textContent=l.mode;
+  document.getElementById("lunarTip").textContent=l.tip;
+  return l;
+}
+
+function renderTable(results){
+  if(results.length===0){
+    document.getElementById("tableArea").innerHTML='<div class="empty">沒有符合條件的標的</div>';
+    return;
+  }
+  let html='<table><thead><tr><th>#</th><th>幣種</th><th>現價</th><th>24H漲幅</th><th>均線差距</th><th>密集</th><th>最新K線</th><th>信號</th><th>建議</th><th></th></tr></thead><tbody>';
+  results.forEach((r,i)=>{
+    const t=r.ticker,ma=r.ma,sig=r.signal;
+    const chg=parseFloat(t.priceChangePercent);
+    const chgClass=chg>0?"up":"down";
+    const denseHtml=ma?`<span class="dense-dot ${ma.isDense?'dense-yes':'dense-no'}"></span>${ma.isDense?'<span class="up">密集</span>':'<span style="color:var(--text3)">否</span>'}`:'--';
+    const gapHtml=ma?`<span style="color:${ma.isDense?'var(--green)':'var(--text2)'};font-family:var(--mono)">${ma.gap}%</span>`:'--';
+    const lastKHtml=ma?`<span class="${ma.lastKChg>0?'up':'down'}" style="font-family:var(--mono)">${ma.lastKChg>0?'+':''}${ma.lastKChg}%</span>`:'--';
+    const lvl=sig?sig.level:"--";
+    const isSelected=selectedIdx===i;
+    html+=`<tr onclick="selectRow(${i})" style="cursor:pointer;${isSelected?'background:rgba(0,212,255,0.05);outline:1px solid rgba(0,212,255,0.2);':''}">
+      <td style="color:var(--text3);font-family:var(--mono)">${i+1}</td>
+      <td><div class="sym">${t.symbol.replace('USDT','')}</div><div class="sym-full">${t.symbol}</div></td>
+      <td style="font-family:var(--mono)">${parseFloat(t.lastPrice).toPrecision(6)}</td>
+      <td class="${chgClass}" style="font-family:var(--mono);font-weight:700">+${chg.toFixed(2)}%</td>
+      <td>${gapHtml}</td>
+      <td>${denseHtml}</td>
+      <td>${lastKHtml}</td>
+      <td>${lvl!=="--"?`<span class="badge badge-${lvl}">${lvl}</span>`:'--'}</td>
+      <td style="font-size:12px;color:var(--text2)">${sig?sig.action:''}</td>
+      <td><button class="action-btn" onclick="event.stopPropagation();selectRow(${i})">詳情</button></td>
+    </tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById("tableArea").innerHTML=html;
+}
+
+function selectRow(i){
+  selectedIdx=i;
+  const r=scanResults[i];
+  if(!r)return;
+  const t=r.ticker,ma=r.ma,sig=r.signal,l=getTodayLunar();
+  if(!ma||!sig){document.getElementById("detailContent").innerHTML='<div class="empty">均線數據載入中...</div>';return;}
+  const chg=parseFloat(t.priceChangePercent);
+  const sym=t.symbol.replace("USDT","");
+  document.getElementById("detailContent").innerHTML=`
+    <div class="detail-sym">${sym} <span style="font-size:14px;color:var(--text2)">/ USDT</span></div>
+    <div class="detail-price">${parseFloat(t.lastPrice).toPrecision(6)} USDT</div>
+    <div class="detail-row"><span class="detail-key">24H漲幅</span><span class="detail-val ${chg>0?'up':'down'}">${chg>0?'+':''}${chg.toFixed(2)}%</span></div>
+    <div class="detail-row"><span class="detail-key">EMA20</span><span class="detail-val">${ma.ema20.toPrecision(6)}</span></div>
+    <div class="detail-row"><span class="detail-key">EMA60</span><span class="detail-val">${ma.ema60.toPrecision(6)}</span></div>
+    <div class="detail-row"><span class="detail-key">均線差距</span><span class="detail-val ${ma.isDense?'up':'neu'}">${ma.gap}% ${ma.isDense?'★密集':''}</span></div>
+    <div class="detail-row"><span class="detail-key">最新15min K</span><span class="detail-val ${ma.lastKChg>0?'up':'down'}">${ma.lastKChg>0?'+':''}${ma.lastKChg}%</span></div>
+    <div class="detail-row"><span class="detail-key">信號等級</span><span class="badge badge-${sig.level}">${sig.level}</span></div>
+    <div class="detail-row"><span class="detail-key">信號依據</span><span class="detail-val" style="font-size:11px;text-align:right">${sig.reasons.join(' · ')}</span></div>
+    <div class="sl-tp-box">
+      <div class="sl-tp-row"><span style="color:var(--text2)">止損 (-5%)</span><span class="sl">${sig.sl}</span></div>
+      <div class="sl-tp-row"><span style="color:var(--text2)">止盈 (+30%)</span><span class="tp">${sig.tp}</span></div>
+      <div class="sl-tp-row"><span style="color:var(--text2)">損益比</span><span class="rr">1 : ${sig.rr}</span></div>
+      <div class="sl-tp-row"><span style="color:var(--text2)">建議倉位</span><span style="font-family:var(--mono);color:var(--text)">$100 × 3倍槓桿</span></div>
+    </div>
+    <div class="buy-signal ${sig.buyClass}">${sig.buySignal}</div>
+  `;
+  renderTable(scanResults);
+}
+
+// ══════════════════════════════════════════
+//  主掃描流程
+// ══════════════════════════════════════════
+async function runScan(){
+  const btn=document.getElementById("scanBtn");
+  btn.disabled=true; btn.textContent="掃描中...";
+  document.getElementById("tableArea").innerHTML='<div class="loading"><div class="spinner"></div>正在從幣安抓取數據...</div>';
+  log("開始掃描幣安前10名...");
+  scanResults=[];
+  selectedIdx=null;
+
+  const lunar=updateLunar();
+
+  try{
+    // BTC
+    const btc=await fetchBTC();
+    const btcChg=parseFloat(btc.priceChangePercent);
+    document.getElementById("btcPrice").textContent=`$${parseFloat(btc.lastPrice).toLocaleString()}`;
+    const btcEl=document.getElementById("btcChange");
+    btcEl.textContent=`${btcChg>0?'+':''}${btcChg.toFixed(2)}% (24H)`;
+    btcEl.className=`stat-sub ${btcChg>0?'up':'down'}`;
+    log(`BTC: $${parseFloat(btc.lastPrice).toLocaleString()} (${btcChg>0?'+':''}${btcChg.toFixed(2)}%)`,"ok");
+
+    // Top 10
+    log("抓取24H漲幅前10名...");
+    const top10=await fetchTop10();
+    log(`找到 ${top10.length} 個標的`,"ok");
+
+    // MA analysis
+    let sigCount=0;
+    for(let i=0;i<top10.length;i++){
+      const t=top10[i];
+      const sym=t.symbol;
+      log(`分析 ${sym} (${i+1}/${top10.length})...`);
+      document.getElementById("scanMeta").textContent=`分析中 ${i+1}/${top10.length}: ${sym}`;
+      try{
+        const candles=await fetchKlines(sym);
+        const ma=analyzeMA(candles);
+        const sig=ma?evalSignal(lunar,t,ma):null;
+        scanResults.push({ticker:t,ma,signal:sig});
+        if(sig&&sig.level!=="NONE"&&sig.level!=="C"){
+          sigCount++;
+          log(`${sym}: [${sig.level}] ${sig.action}`,"warn");
+        }
+        await new Promise(r=>setTimeout(r,200));
+      }catch(e){
+        scanResults.push({ticker:t,ma:null,signal:null});
+        log(`${sym}: 分析失敗`,"err");
+      }
+    }
+
+    document.getElementById("signalCount").textContent=sigCount;
+    document.getElementById("lastScan").textContent=`${new Date().toLocaleTimeString("zh-TW",{hour12:false})} 更新`;
+    document.getElementById("scanMeta").textContent=`${new Date().toLocaleTimeString("zh-TW",{hour12:false})} 更新 · ${top10.length}個標的`;
+    renderTable(scanResults);
+    log(`掃描完成！共 ${sigCount} 個有效信號`,"ok");
+  }catch(e){
+    log(`掃描失敗：${e.message}`,"err");
+    document.getElementById("tableArea").innerHTML=`<div class="empty">掃描失敗：${e.message}<br><br>請確認網路連線，幣安在中國大陸需要VPN</div>`;
+  }
+
+  btn.disabled=false; btn.textContent="▶ 立即掃描";
+}
+
+// ══════════════════════════════════════════
+//  時鐘 + 農曆初始化
+// ══════════════════════════════════════════
+function updateClock(){
+  const now=new Date();
+  document.getElementById("clock").textContent=now.toLocaleTimeString("zh-TW",{hour12:false});
+}
+setInterval(updateClock,1000);
+updateClock();
+updateLunar();
+log("農曆資訊載入完成","ok");
+log("請點擊「立即掃描」或等待系統自動掃描","info");
+
+// 每15分鐘自動掃描
+setInterval(()=>{
+  log("自動掃描觸發（每15分鐘）","info");
+  runScan();
+},15*60*1000);
+</script>
+</body>
+</html>
